@@ -54,6 +54,7 @@ html,body{margin:0; background:var(--bg); color:var(--text); font-family:-apple-
 .row-amount-lg{font-size:17px; font-weight:800;}
 .chip{display:inline-block; font-size:10px; font-weight:700; padding:3px 8px; border-radius:8px; margin-top:3px;}
 .chip-received{background:#dcfce7; color:#166534;}
+.chip-neutral{background:var(--border); color:var(--sub); margin-top:0; margin-left:6px; vertical-align:middle;}
 @media (prefers-color-scheme: dark){
   .chip-received{background:#123420; color:#4ade80;}
 }
@@ -99,13 +100,16 @@ const PAYOUTS = [
   {id:'p20', name:'EJ 2nd Payout',  day:20, defaultAmount:5600},
 ];
 
+// paymentMethod 'credit' means settling this bill doesn't leave the bank
+// right away — it moves the amount into the Credit Card balance instead,
+// same as a Credit Card Spend. Omitted/'bank' means it's a direct debit.
 const BUCKETS = [
   {id:'sunlife',      name:'Sun Life',        category:'bill'},
   {id:'phone',        name:'Phone',           category:'bill'},
   {id:'parents',      name:'Parents',         category:'bill'},
   {id:'parentsglobe', name:"Parent's Globe",  category:'bill'},
-  {id:'youtube',      name:'YouTube Premium', category:'bill'},
-  {id:'netflix',      name:'Netflix',         category:'bill'},
+  {id:'youtube',      name:'YouTube Premium', category:'bill', paymentMethod:'credit'},
+  {id:'netflix',      name:'Netflix',         category:'bill', paymentMethod:'credit'},
   {id:'allowance',    name:'EJ Allowance',    category:'allowance'},
   {id:'creditcard',   name:'Credit Card',     category:'creditcard'},
 ];
@@ -531,7 +535,19 @@ function openSpendModal(prefillAmount, onDone){
 
 function markBucketPaid(bucketId){
   const due = bucketBalance(bucketId);
-  if(due > 0) addExpense(bucketId, due, 'Marked as paid', todayISO());
+  if(due <= 0) return;
+  const bucket = BUCKETS.find(b=>b.id===bucketId);
+  if(bucket && bucket.paymentMethod === 'credit'){
+    // Settles the sinking fund, but the cash moves to what you owe on
+    // the card instead of leaving the bank — same net-zero transfer as
+    // a Credit Card Spend.
+    state.transactions.push({id:uid(), bucketId, monthKey: monthKeyOf(viewDate), amount: -due, type:'expense', note:'Paid via credit card', date: todayISO()});
+    state.transactions.push({id:uid(), bucketId:'creditcard', monthKey: monthKeyOf(viewDate), amount: due, type:'creditcard-charge', note: `${bucket.name} bill`, date: todayISO()});
+    saveState();
+    render();
+  } else {
+    addExpense(bucketId, due, 'Marked as paid', todayISO());
+  }
 }
 
 function openAdjustModal(bucket){
@@ -647,7 +663,7 @@ function render(){
 
     html += `<div class="row-card">
       <div class="row-main">
-        <p class="row-title">${b.name}</p>
+        <p class="row-title">${b.name}${b.paymentMethod === 'credit' ? '<span class="chip chip-neutral">Credit Card</span>' : ''}</p>
         <p class="row-sub">adds ${peso(expected)}/mo when payouts land</p>
       </div>
       <div class="row-right" style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">

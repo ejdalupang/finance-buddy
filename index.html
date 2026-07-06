@@ -67,6 +67,10 @@ html,body{margin:0; background:var(--bg); color:var(--text); font-family:-apple-
 .btn-small{border:1px solid var(--border); background:transparent; color:var(--text); border-radius:10px; padding:6px 10px; font-size:12px; font-weight:700; flex:none;}
 .btn-small.primary{background:var(--accent); border-color:var(--accent); color:#fff;}
 
+.method-toggle{display:flex; gap:8px;}
+.method-btn{flex:1; padding:10px; border-radius:10px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:13px; font-weight:700;}
+.method-btn.active{background:var(--accent); border-color:var(--accent); color:#fff;}
+
 .overlay{position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:flex-end; justify-content:center; z-index:20;}
 .overlay.hidden{display:none;}
 .modal{background:var(--card); width:100%; max-width:480px; border-radius:20px 20px 0 0; padding:20px 20px calc(20px + env(safe-area-inset-bottom));}
@@ -103,6 +107,7 @@ const BUCKETS = [
   {id:'youtube',      name:'YouTube Premium', category:'bill'},
   {id:'netflix',      name:'Netflix',         category:'bill'},
   {id:'allowance',    name:'EJ Allowance',    category:'allowance'},
+  {id:'creditcard',   name:'Credit Card',     category:'creditcard'},
 ];
 
 const RULES = [
@@ -351,9 +356,11 @@ function openPayoutMatchModal(delta, newBalance){
 function openSummaryModal(newBalance){
   const bills = billsTotal();
   const allowance = bucketBalance('allowance');
+  const creditCard = bucketBalance('creditcard');
   openModal(`
     <h3>&#10003; Here's where your ${peso(newBalance)} stands</h3>
     <div class="summary-row"><span>Bills &mdash; saved so far</span><strong>${peso(bills)}</strong></div>
+    ${creditCard > 0 ? `<div class="summary-row"><span>Credit Card &mdash; owed</span><strong>${peso(creditCard)}</strong></div>` : ''}
     <div class="summary-row summary-highlight"><span>Allowance &mdash; yours to spend</span><strong>${peso(allowance)}</strong></div>
     <div class="modal-actions">
       <button class="btn-submit" id="f-done">Got it</button>
@@ -466,14 +473,36 @@ function openIncomeModal(payout){
   });
 }
 
-// Spending is always against Allowance — that's the only bucket you draw
-// down day-to-day, bills get settled via "Log payment" instead.
+// Spending always reduces Allowance immediately (so you feel it right
+// away), regardless of payment method. But a Credit Card spend doesn't
+// leave your bank yet — so it also moves the same amount into the
+// Credit Card bucket, netting to zero against your tracked bank total,
+// until you settle the statement via "Log payment" on that bucket.
+function logSpend(amount, note, date, method){
+  if(method === 'credit'){
+    state.transactions.push({id:uid(), bucketId:'allowance', monthKey: monthKeyOf(viewDate), amount: -Math.abs(amount), type:'expense', note: note||'', date});
+    state.transactions.push({id:uid(), bucketId:'creditcard', monthKey: monthKeyOf(viewDate), amount: Math.abs(amount), type:'creditcard-charge', note: note||'', date});
+    saveState();
+    render();
+  } else {
+    addExpense('allowance', amount, note, date);
+  }
+}
+
 function openSpendModal(prefillAmount, onDone){
   const balance = bucketBalance('allowance');
   const amountValue = prefillAmount !== undefined ? prefillAmount : '';
+  let method = 'bank';
   openModal(`
     <h3>Spend from Allowance</h3>
     <p class="row-sub" style="margin:-6px 0 14px;">Currently available: <strong>${peso(balance)}</strong></p>
+    <div class="field">
+      <label>Payment method</label>
+      <div class="method-toggle">
+        <button type="button" class="method-btn active" data-method="bank">Bank / Debit</button>
+        <button type="button" class="method-btn" data-method="credit">Credit Card</button>
+      </div>
+    </div>
     <div class="field"><label>Amount</label><input id="f-amount" type="number" value="${amountValue}" placeholder="0" inputmode="decimal" autofocus></div>
     <div class="field"><label>What was it for? (optional)</label><input id="f-note" type="text" placeholder="e.g. Jollibee, Grab, groceries"></div>
     <div class="field"><label>Date</label><input id="f-date" type="date" value="${todayISO()}"></div>
@@ -482,12 +511,18 @@ function openSpendModal(prefillAmount, onDone){
       <button class="btn-submit" id="f-submit">Spend</button>
     </div>
   `, (overlay)=>{
+    overlay.querySelectorAll('.method-btn').forEach(btn=>{
+      btn.onclick = ()=>{
+        method = btn.dataset.method;
+        overlay.querySelectorAll('.method-btn').forEach(b=> b.classList.toggle('active', b === btn));
+      };
+    });
     overlay.querySelector('#f-cancel').onclick = closeModal;
     overlay.querySelector('#f-submit').onclick = ()=>{
       const amt = parseFloat(overlay.querySelector('#f-amount').value) || 0;
       const note = overlay.querySelector('#f-note').value;
       const dt = overlay.querySelector('#f-date').value || todayISO();
-      if(amt > 0){ addExpense('allowance', amt, note, dt); }
+      if(amt > 0){ logSpend(amt, note, dt, method); }
       closeModal();
       if(onDone) onDone();
     };
@@ -541,7 +576,7 @@ function renderReconcileCard(){
     : '';
   return `<div class="reconcile-card">
     <p class="reconcile-title">What's in your bank right now?</p>
-    <p class="row-sub" style="margin:0 0 10px;">The app currently shows you have <strong>${peso(tracked)}</strong> (Bills + Allowance combined). Type your real bank balance below to update it.</p>
+    <p class="row-sub" style="margin:0 0 10px;">The app currently shows you have <strong>${peso(tracked)}</strong> (Bills, Allowance, and unpaid Credit Card charges combined). Type your real bank balance below to update it.</p>
     <div style="display:flex; gap:8px;">
       <input id="bank-balance-input" type="number" placeholder="e.g. 50000" value="" inputmode="decimal" style="flex:1; padding:9px 10px; border-radius:10px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:14px;">
       <button id="check-bank-balance" class="btn-small primary" style="flex:none;">Update</button>
@@ -627,6 +662,26 @@ function render(){
       </div>
     </div>`;
   });
+
+  const ccBalance = bucketBalance('creditcard');
+  html += `<div class="section-title">Credit Card</div>`;
+  html += `<p class="row-sub" style="margin:-4px 4px 10px;">Charged but not yet paid off — settle this from your bank each statement cycle.</p>`;
+  html += `<div class="row-card">
+    <div class="row-main">
+      <p class="row-title">Credit Card</p>
+      <p class="row-sub">Pay this off in full during the 1st week</p>
+    </div>
+    <div class="row-right" style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+      <div>
+        <div class="row-amount-lg">${peso(ccBalance)}</div>
+        <p class="row-sub" style="margin:0;">${ccBalance > 0 ? 'owed' : 'nothing owed'}</p>
+      </div>
+      <div style="display:flex; gap:6px;">
+        ${ccBalance > 0 ? `<button class="btn-small" data-action="mark-paid" data-bucket="creditcard">Log payment</button>` : ''}
+        <button class="btn-small" data-action="adjust" data-bucket="creditcard">Adjust</button>
+      </div>
+    </div>
+  </div>`;
 
   html += `<div class="footnote">
     <div class="sync-line">${

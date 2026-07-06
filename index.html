@@ -38,7 +38,7 @@ html,body{margin:0; background:var(--bg); color:var(--text); font-family:-apple-
 .reconcile-title{font-size:13px; font-weight:700; margin:0 0 6px;}
 .diff-banner{margin-top:10px; padding:10px 12px; border-radius:10px; font-size:13px; font-weight:700; display:flex; align-items:center; gap:8px; line-height:1.3;}
 .diff-match{background:rgba(22,163,74,.15); color:var(--good);}
-.diff-off{background:rgba(217,119,6,.18); color:var(--warn);}
+.diff-short{background:rgba(225,75,75,.15); color:var(--danger);}
 
 .choice-list{display:flex; flex-direction:column; gap:8px; margin-bottom:6px;}
 .choice-btn{display:flex; align-items:center; justify-content:space-between; width:100%; text-align:left; padding:12px 14px; border-radius:12px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:14px; font-weight:700;}
@@ -621,9 +621,9 @@ function diffBannerHtml(diff, checkedDate){
   if(diff === 0){
     return `<div class="diff-banner diff-match">&#10003; Matches exactly${checkedDate ? ` &mdash; checked ${checkedDate}` : ''}</div>`;
   } else if(diff > 0){
-    return `<div class="diff-banner diff-off">&#9888;&#65039; Bank is ${peso(diff)} MORE than the app expects &mdash; extra income, or a payout you forgot to log?</div>`;
+    return `<div class="diff-banner diff-match">&#10133; Bank is ${peso(diff)} MORE than the app expects &mdash; extra income, or a payout you forgot to log?</div>`;
   } else {
-    return `<div class="diff-banner diff-off">&#9888;&#65039; Bank is ${peso(Math.abs(diff))} LESS than the app expects &mdash; an expense that hasn't been logged yet?</div>`;
+    return `<div class="diff-banner diff-short">&#9888;&#65039; Bank is ${peso(Math.abs(diff))} LESS than the app expects &mdash; an expense that hasn't been logged yet?</div>`;
   }
 }
 

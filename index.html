@@ -199,34 +199,33 @@ window.addEventListener('fb-auth-changed', async (e)=>{
 function openSyncEmailModal(){
   openModal(`
     <h3>Sync across devices</h3>
-    <p class="row-sub" style="margin:-6px 0 14px;">We'll email you a sign-in link — no password needed. Open it on each device you want synced.</p>
+    <p class="row-sub" style="margin:-6px 0 14px;">First device? Create an account. Adding another device (like your phone)? Sign in with the same email &amp; password.</p>
     <div class="field"><label>Email</label><input id="f-email" type="email" placeholder="you@example.com"></div>
+    <div class="field"><label>Password</label><input id="f-password" type="password" placeholder="At least 6 characters"></div>
+    <p class="row-sub" id="f-error" style="color:var(--danger); margin:-4px 0 10px; display:none;"></p>
     <div class="modal-actions">
       <button class="btn-cancel" id="f-cancel">Cancel</button>
-      <button class="btn-submit" id="f-submit">Send link</button>
+      <button class="btn-submit" id="f-signin">Sign In</button>
+      <button class="btn-submit" id="f-create">Create Account</button>
     </div>
   `, (overlay)=>{
+    const showError = (msg)=>{ const el = overlay.querySelector('#f-error'); el.textContent = msg; el.style.display = 'block'; };
     overlay.querySelector('#f-cancel').onclick = closeModal;
-    overlay.querySelector('#f-submit').onclick = async ()=>{
-      const email = overlay.querySelector('#f-email').value.trim();
-      if(!email || !email.includes('@')) return;
-      const btn = overlay.querySelector('#f-submit');
-      btn.disabled = true;
-      btn.textContent = 'Sending…';
-      try{
-        await window.FB.sendLoginLink(email);
-        openModal(`
-          <h3>Check your email</h3>
-          <p class="row-sub" style="margin:-6px 0 14px;">We sent a sign-in link to ${escapeHtml(email)}. Open it on this device to finish signing in.</p>
-          <div class="modal-actions"><button class="btn-submit" id="f-done">Got it</button></div>
-        `, (o)=> o.querySelector('#f-done').onclick = closeModal);
-      }catch(err){
-        openModal(`
-          <h3>Could not send link</h3>
-          <p class="row-sub" style="margin:-6px 0 14px;">${escapeHtml(err.message)}</p>
-          <div class="modal-actions"><button class="btn-submit" id="f-done">OK</button></div>
-        `, (o)=> o.querySelector('#f-done').onclick = closeModal);
-      }
+    const getCreds = ()=>({
+      email: overlay.querySelector('#f-email').value.trim(),
+      password: overlay.querySelector('#f-password').value
+    });
+    overlay.querySelector('#f-create').onclick = async ()=>{
+      const {email, password} = getCreds();
+      if(!email || !email.includes('@') || password.length < 6){ showError('Enter a valid email and a password of at least 6 characters.'); return; }
+      try{ await window.FB.createAccount(email, password); closeModal(); }
+      catch(err){ showError(err.message); }
+    };
+    overlay.querySelector('#f-signin').onclick = async ()=>{
+      const {email, password} = getCreds();
+      if(!email || !password){ showError('Enter your email and password.'); return; }
+      try{ await window.FB.signIn(email, password); closeModal(); }
+      catch(err){ showError(err.message); }
     };
   });
 }
@@ -685,7 +684,7 @@ render();
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
-  import { getAuth, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
   import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -704,47 +703,13 @@ render();
   let unsubscribeSnapshot = null;
   let lastLocalWriteAt = 0;
 
-  async function completeSignInIfNeeded(){
-    if (!isSignInWithEmailLink(auth, window.location.href)) return false;
-    const storedEmail = localStorage.getItem('financeTracker.pendingEmail');
-    if (storedEmail){
-      await signInWithEmailLink(auth, storedEmail, window.location.href);
-      localStorage.removeItem('financeTracker.pendingEmail');
-      window.history.replaceState({}, document.title, window.location.pathname);
-      return true;
-    }
-    return new Promise((resolve)=>{
-      window.openModal(`
-        <h3>Confirm your email</h3>
-        <p class="row-sub" style="margin:-6px 0 14px;">Enter the email you used to request this sign-in link.</p>
-        <div class="field"><input id="f-email" type="email" placeholder="you@example.com"></div>
-        <div class="modal-actions">
-          <button class="btn-cancel" id="f-cancel">Cancel</button>
-          <button class="btn-submit" id="f-submit">Sign In</button>
-        </div>
-      `, (overlay)=>{
-        overlay.querySelector('#f-cancel').onclick = ()=>{ window.closeModal(); resolve(false); };
-        overlay.querySelector('#f-submit').onclick = async ()=>{
-          const typedEmail = overlay.querySelector('#f-email').value.trim();
-          try{
-            await signInWithEmailLink(auth, typedEmail, window.location.href);
-            window.history.replaceState({}, document.title, window.location.pathname);
-            window.closeModal();
-            resolve(true);
-          }catch(err){
-            alert('Sign-in failed: ' + err.message);
-            resolve(false);
-          }
-        };
-      });
-    });
-  }
-
   window.FB = {
     user: null,
-    sendLoginLink: async (email)=>{
-      await sendSignInLinkToEmail(auth, email, { url: window.location.href, handleCodeInApp: true });
-      localStorage.setItem('financeTracker.pendingEmail', email);
+    createAccount: async (email, password)=>{
+      await createUserWithEmailAndPassword(auth, email, password);
+    },
+    signIn: async (email, password)=>{
+      await signInWithEmailAndPassword(auth, email, password);
     },
     signOut: async ()=>{
       if (unsubscribeSnapshot){ unsubscribeSnapshot(); unsubscribeSnapshot = null; }
@@ -780,8 +745,6 @@ render();
     window.FB.user = user;
     window.dispatchEvent(new CustomEvent('fb-auth-changed', { detail: { user } }));
   });
-
-  completeSignInIfNeeded();
 </script>
 </body>
 </html>

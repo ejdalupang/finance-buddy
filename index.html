@@ -342,6 +342,7 @@ function openPayoutMatchModal(delta, newBalance){
       btn.onclick = ()=>{
         const pid = btn.dataset.choicePayout;
         if(pid === 'other'){
+          captureUndo();
           state.transactions.push({id:uid(), bucketId:'allowance', monthKey: monthKeyOf(viewDate), amount: delta, type:'allocation', note:'Extra / bonus money', date: todayISO()});
           saveState();
         } else {
@@ -401,7 +402,22 @@ function openBalanceDecreaseModal(delta, newBalance){
   });
 }
 
+// Single-level undo: snapshot the whole state right before a mutating
+// action runs, so one click can put it back exactly as it was.
+let undoSnapshot = null;
+function captureUndo(){
+  undoSnapshot = JSON.parse(JSON.stringify(state));
+}
+function undoLastAction(){
+  if(!undoSnapshot) return;
+  state = undoSnapshot;
+  undoSnapshot = null;
+  saveState();
+  render();
+}
+
 function addExpense(bucketId, amount, note, date){
+  captureUndo();
   state.transactions.push({id:uid(), bucketId, monthKey: monthKeyOf(viewDate), amount: -Math.abs(amount), type:'expense', note: note||'', date: date||todayISO()});
   saveState();
   render();
@@ -410,12 +426,14 @@ function addExpense(bucketId, amount, note, date){
 function adjustBucketBalance(bucketId, newBalance, note){
   const delta = newBalance - bucketBalance(bucketId);
   if(delta === 0) return;
+  captureUndo();
   state.transactions.push({id:uid(), bucketId, monthKey: monthKeyOf(viewDate), amount: delta, type:'adjustment', note: note || 'Manual adjustment', date: todayISO()});
   saveState();
   render();
 }
 
 function logIncome(payoutId, amount, date){
+  captureUndo();
   const mk = monthKeyOf(viewDate);
   let existing = getIncomeEvent(payoutId, mk);
   if(existing){
@@ -484,6 +502,7 @@ function openIncomeModal(payout){
 // until you settle the statement via "Log payment" on that bucket.
 function logSpend(amount, note, date, method){
   if(method === 'credit'){
+    captureUndo();
     state.transactions.push({id:uid(), bucketId:'allowance', monthKey: monthKeyOf(viewDate), amount: -Math.abs(amount), type:'expense', note: note||'', date});
     state.transactions.push({id:uid(), bucketId:'creditcard', monthKey: monthKeyOf(viewDate), amount: Math.abs(amount), type:'creditcard-charge', note: note||'', date});
     saveState();
@@ -533,21 +552,45 @@ function openSpendModal(prefillAmount, onDone){
   });
 }
 
-function markBucketPaid(bucketId){
-  const due = bucketBalance(bucketId);
-  if(due <= 0) return;
-  const bucket = BUCKETS.find(b=>b.id===bucketId);
-  if(bucket && bucket.paymentMethod === 'credit'){
+function payBucket(bucket, amount, note, date){
+  captureUndo();
+  if(bucket.paymentMethod === 'credit'){
     // Settles the sinking fund, but the cash moves to what you owe on
     // the card instead of leaving the bank — same net-zero transfer as
     // a Credit Card Spend.
-    state.transactions.push({id:uid(), bucketId, monthKey: monthKeyOf(viewDate), amount: -due, type:'expense', note:'Paid via credit card', date: todayISO()});
-    state.transactions.push({id:uid(), bucketId:'creditcard', monthKey: monthKeyOf(viewDate), amount: due, type:'creditcard-charge', note: `${bucket.name} bill`, date: todayISO()});
+    state.transactions.push({id:uid(), bucketId:bucket.id, monthKey: monthKeyOf(viewDate), amount: -amount, type:'expense', note: note || 'Paid via credit card', date});
+    state.transactions.push({id:uid(), bucketId:'creditcard', monthKey: monthKeyOf(viewDate), amount: amount, type:'creditcard-charge', note: note || `${bucket.name} bill`, date});
     saveState();
     render();
   } else {
-    addExpense(bucketId, due, 'Marked as paid', todayISO());
+    state.transactions.push({id:uid(), bucketId:bucket.id, monthKey: monthKeyOf(viewDate), amount: -amount, type:'expense', note: note || 'Payment', date});
+    saveState();
+    render();
   }
+}
+
+function openPaymentModal(bucket){
+  const due = bucketBalance(bucket.id);
+  openModal(`
+    <h3>Log payment &mdash; ${bucket.name}</h3>
+    <p class="row-sub" style="margin:-6px 0 14px;">Currently ${bucket.category === 'creditcard' ? 'owed' : 'saved'}: <strong>${peso(due)}</strong></p>
+    <div class="field"><label>Amount paid</label><input id="f-amount" type="number" value="${due}" inputmode="decimal" autofocus></div>
+    <div class="field"><label>Note (optional)</label><input id="f-note" type="text" placeholder="e.g. partial payment"></div>
+    <div class="field"><label>Date</label><input id="f-date" type="date" value="${todayISO()}"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="f-cancel">Cancel</button>
+      <button class="btn-submit" id="f-submit">Log Payment</button>
+    </div>
+  `, (overlay)=>{
+    overlay.querySelector('#f-cancel').onclick = closeModal;
+    overlay.querySelector('#f-submit').onclick = ()=>{
+      const amt = parseFloat(overlay.querySelector('#f-amount').value) || 0;
+      const note = overlay.querySelector('#f-note').value;
+      const dt = overlay.querySelector('#f-date').value || todayISO();
+      if(amt > 0){ payBucket(bucket, amt, note, dt); }
+      closeModal();
+    };
+  });
 }
 
 function openAdjustModal(bucket){
@@ -700,6 +743,7 @@ function render(){
   </div>`;
 
   html += `<div class="footnote">
+    ${undoSnapshot ? `<div class="sync-line"><button class="link-btn" id="btn-undo">Undo last action</button></div>` : ''}
     <div class="sync-line">${
       cloudUser
         ? `Synced as ${escapeHtml(cloudUser.email)} &middot; <button class="link-btn" id="btn-signout">Sign out</button>`
@@ -739,11 +783,18 @@ function render(){
     btn.onclick = (e)=>{ e.stopPropagation(); openAdjustModal(BUCKETS.find(b=>b.id===btn.dataset.bucket)); };
   });
   app.querySelectorAll('[data-action="mark-paid"]').forEach(btn=>{
-    btn.onclick = (e)=>{ e.stopPropagation(); markBucketPaid(btn.dataset.bucket); };
+    btn.onclick = (e)=>{ e.stopPropagation(); openPaymentModal(BUCKETS.find(b=>b.id===btn.dataset.bucket)); };
   });
   app.querySelector('#reset-data').onclick = ()=>{
-    if(confirm('Clear all data on this device (and in the cloud if synced)?')){ state = {incomeEvents:[], transactions:[], reconciliation:{bankBalance:null, checkedDate:null}}; saveState(); render(); }
+    if(confirm('Clear all data on this device (and in the cloud if synced)?')){
+      captureUndo();
+      state = {incomeEvents:[], transactions:[], reconciliation:{bankBalance:null, checkedDate:null}};
+      saveState();
+      render();
+    }
   };
+  const undoBtn = app.querySelector('#btn-undo');
+  if(undoBtn) undoBtn.onclick = undoLastAction;
   const syncBtn = app.querySelector('#btn-sync');
   if(syncBtn) syncBtn.onclick = openSyncEmailModal;
   const signOutBtn = app.querySelector('#btn-signout');

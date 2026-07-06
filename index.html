@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Finance Tracker — Prototype</title>
+<style>
+:root{
+  --bg:#f4f5f8; --card:#ffffff; --text:#1c1e26; --sub:#6b7280; --border:#e5e7eb;
+  --accent:#6d5bf0; --accent-ink:#ffffff; --danger:#e14b4b; --good:#16a34a; --warn:#d97706;
+  --shadow:0 1px 3px rgba(20,20,40,.08);
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#14151c; --card:#1d1f29; --text:#eef0f6; --sub:#9aa0ac; --border:#2b2e3a; --shadow:0 1px 3px rgba(0,0,0,.4); }
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
+#app{max-width:480px; margin:0 auto; padding:16px 16px 60px;}
+.header{display:flex; align-items:center; justify-content:space-between; padding:10px 2px 18px;}
+.header h1{font-size:19px; margin:0; font-weight:700;}
+.month-nav{display:flex; align-items:center; gap:10px; color:var(--sub); font-size:13px; font-weight:600;}
+.month-nav button{width:28px; height:28px; border-radius:8px; border:none; background:var(--card); box-shadow:var(--shadow); color:var(--text); font-size:14px;}
+.badge-proto{display:inline-block; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; background:var(--warn); color:#fff; padding:2px 6px; border-radius:6px; margin-left:8px; vertical-align:middle;}
+
+.allowance-card{background:linear-gradient(135deg,var(--accent),#8d7cf7); border-radius:20px; padding:20px; color:#fff; box-shadow:var(--shadow); margin-bottom:18px;}
+.allowance-card .label{font-size:13px; opacity:.85; font-weight:600;}
+.allowance-card .amount{font-size:34px; font-weight:800; margin:4px 0 2px;}
+.allowance-card .sub{font-size:12px; opacity:.8;}
+.allowance-card button{margin-top:14px; background:rgba(255,255,255,.18); border:1px solid rgba(255,255,255,.4); color:#fff; border-radius:12px; padding:10px 14px; font-size:14px; font-weight:700; width:100%;}
+.allowance-history{margin-top:14px; padding-top:12px; border-top:1px solid rgba(255,255,255,.25);}
+.allowance-history-title{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; opacity:.75; margin:0 0 8px;}
+.allowance-history-row{display:flex; justify-content:space-between; gap:10px; font-size:12px; padding:4px 0; opacity:.92;}
+.allowance-history-empty{font-size:12px; opacity:.75; margin:0;}
+
+.section-title{font-size:12px; font-weight:700; color:var(--sub); text-transform:uppercase; letter-spacing:.04em; margin:20px 4px 8px;}
+
+.reconcile-card{background:var(--card); border-radius:14px; box-shadow:var(--shadow); padding:14px; margin-bottom:16px;}
+.reconcile-title{font-size:13px; font-weight:700; margin:0 0 6px;}
+.diff-banner{margin-top:10px; padding:10px 12px; border-radius:10px; font-size:13px; font-weight:700; display:flex; align-items:center; gap:8px; line-height:1.3;}
+.diff-match{background:rgba(22,163,74,.15); color:var(--good);}
+.diff-off{background:rgba(217,119,6,.18); color:var(--warn);}
+
+.choice-list{display:flex; flex-direction:column; gap:8px; margin-bottom:6px;}
+.choice-btn{display:flex; align-items:center; justify-content:space-between; width:100%; text-align:left; padding:12px 14px; border-radius:12px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:14px; font-weight:700;}
+.choice-amount{font-size:12px; font-weight:600; color:var(--sub); display:flex; align-items:center; gap:6px;}
+.choice-badge{font-size:9px; font-weight:800; text-transform:uppercase; background:var(--good); color:#fff; padding:2px 6px; border-radius:6px;}
+
+.row-card{background:var(--card); border-radius:14px; box-shadow:var(--shadow); padding:12px 14px; margin-bottom:8px; display:flex; align-items:center; gap:10px;}
+.row-main{flex:1; min-width:0;}
+.row-title{font-size:14px; font-weight:700; margin:0;}
+.row-sub{font-size:12px; color:var(--sub); margin:2px 0 0;}
+.row-right{text-align:right; flex:none;}
+.row-amount{font-size:14px; font-weight:700;}
+.row-amount-lg{font-size:17px; font-weight:800;}
+.chip{display:inline-block; font-size:10px; font-weight:700; padding:3px 8px; border-radius:8px; margin-top:3px;}
+.chip-received{background:#dcfce7; color:#166534;}
+@media (prefers-color-scheme: dark){
+  .chip-received{background:#123420; color:#4ade80;}
+}
+
+.summary-row{display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-bottom:1px solid var(--border); font-size:14px;}
+.summary-row:last-of-type{border-bottom:none;}
+.summary-row strong{font-size:16px;}
+.summary-highlight strong{color:var(--accent); font-size:22px;}
+.progress-track{height:5px; background:var(--border); border-radius:3px; margin-top:6px; overflow:hidden;}
+.progress-fill{height:100%; background:var(--good); border-radius:3px;}
+.btn-small{border:1px solid var(--border); background:transparent; color:var(--text); border-radius:10px; padding:6px 10px; font-size:12px; font-weight:700; flex:none;}
+.btn-small.primary{background:var(--accent); border-color:var(--accent); color:#fff;}
+
+.overlay{position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:flex-end; justify-content:center; z-index:20;}
+.overlay.hidden{display:none;}
+.modal{background:var(--card); width:100%; max-width:480px; border-radius:20px 20px 0 0; padding:20px 20px calc(20px + env(safe-area-inset-bottom));}
+.modal h3{margin:0 0 14px; font-size:16px;}
+.field{margin-bottom:12px;}
+.field label{display:block; font-size:12px; font-weight:700; color:var(--sub); margin-bottom:5px;}
+.field input, .field select{width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:15px;}
+.modal-actions{display:flex; gap:10px; margin-top:16px;}
+.modal-actions button{flex:1; padding:12px; border-radius:12px; font-size:14px; font-weight:700; border:none;}
+.btn-cancel{background:var(--bg); color:var(--text); border:1px solid var(--border) !important;}
+.btn-submit{background:var(--accent); color:#fff;}
+
+.footnote{text-align:center; margin-top:24px; font-size:11px; color:var(--sub);}
+.footnote button{background:none; border:none; color:var(--danger); font-size:11px; text-decoration:underline; padding:0;}
+.link-btn{background:none; border:none; color:var(--accent); font-size:11px; font-weight:700; text-decoration:underline; padding:0; cursor:pointer;}
+.sync-line{margin-bottom:6px;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+const PAYOUTS = [
+  {id:'p5',  name:'EJ 1st Payout',  day:5,  defaultAmount:4300},
+  {id:'p15', name:"Rich's Payout",  day:15, defaultAmount:9600},
+  {id:'p20', name:'EJ 2nd Payout',  day:20, defaultAmount:5600},
+];
+
+const BUCKETS = [
+  {id:'sunlife',      name:'Sun Life',        category:'bill'},
+  {id:'phone',        name:'Phone',           category:'bill'},
+  {id:'parents',      name:'Parents',         category:'bill'},
+  {id:'parentsglobe', name:"Parent's Globe",  category:'bill'},
+  {id:'youtube',      name:'YouTube Premium', category:'bill'},
+  {id:'netflix',      name:'Netflix',         category:'bill'},
+  {id:'allowance',    name:'EJ Allowance',    category:'allowance'},
+];
+
+const RULES = [
+  {payoutId:'p5',  bucketId:'sunlife',      amount:1670},
+  {payoutId:'p5',  bucketId:'phone',        amount:500},
+  {payoutId:'p5',  bucketId:'parents',      amount:1035},
+  {payoutId:'p5',  bucketId:'parentsglobe', amount:750},
+  {payoutId:'p5',  bucketId:'youtube',      amount:70},
+  {payoutId:'p5',  bucketId:'netflix',      amount:275},
+  {payoutId:'p15', bucketId:'parents',      amount:5200},
+  {payoutId:'p15', bucketId:'allowance',    amount:4400},
+  {payoutId:'p20', bucketId:'sunlife',      amount:1670},
+  {payoutId:'p20', bucketId:'phone',        amount:500},
+  {payoutId:'p20', bucketId:'parents',      amount:2335},
+  {payoutId:'p20', bucketId:'parentsglobe', amount:750},
+  {payoutId:'p20', bucketId:'youtube',      amount:70},
+  {payoutId:'p20', bucketId:'netflix',      amount:275},
+];
+
+const STORAGE_KEY = 'financeTrackerPrototype';
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  return {incomeEvents:[], transactions:[], reconciliation:{bankBalance:null, checkedDate:null}};
+}
+
+let cloudUser = null;
+let cloudPushTimer = null;
+let applyingRemoteUpdate = false;
+
+function saveState(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  if(cloudUser && window.FB && !applyingRemoteUpdate){
+    clearTimeout(cloudPushTimer);
+    cloudPushTimer = setTimeout(()=> window.FB.pushState(state), 600);
+  }
+}
+
+function applyRemoteState(json){
+  applyingRemoteUpdate = true;
+  state = JSON.parse(json);
+  if(!state.reconciliation) state.reconciliation = {bankBalance:null, checkedDate:null};
+  saveState();
+  applyingRemoteUpdate = false;
+}
+
+function isStateEmpty(s){
+  return s.incomeEvents.length === 0 && s.transactions.length === 0;
+}
+
+// Fires once Firebase finishes checking auth (see the module script at the
+// bottom). Merges cloud data with whatever's on this device, then keeps
+// both in sync going forward.
+window.addEventListener('fb-auth-changed', async (e)=>{
+  cloudUser = e.detail.user;
+  render();
+  if(!cloudUser) return;
+  try{
+    const remoteJson = await window.FB.fetchOnce();
+    if(remoteJson){
+      const sameData = remoteJson === JSON.stringify(state);
+      if(!sameData){
+        if(isStateEmpty(state)){
+          applyRemoteState(remoteJson);
+          render();
+        } else {
+          openModal(`
+            <h3>Cloud data found</h3>
+            <p class="row-sub" style="margin:-6px 0 14px;">This account already has synced data. Use the cloud version, or keep what's on this device?</p>
+            <div class="modal-actions">
+              <button class="btn-cancel" id="keep-device">Keep This Device</button>
+              <button class="btn-submit" id="use-cloud">Use Cloud Data</button>
+            </div>
+          `, (overlay)=>{
+            overlay.querySelector('#use-cloud').onclick = ()=>{ applyRemoteState(remoteJson); closeModal(); render(); };
+            overlay.querySelector('#keep-device').onclick = ()=>{ window.FB.pushState(state); closeModal(); };
+          });
+        }
+      }
+    } else {
+      window.FB.pushState(state);
+    }
+  }catch(err){ /* offline or blocked — app still works locally */ }
+  window.FB.startSync((remoteJson)=>{
+    if(remoteJson === JSON.stringify(state)) return;
+    applyRemoteState(remoteJson);
+    render();
+  });
+});
+
+function openSyncEmailModal(){
+  openModal(`
+    <h3>Sync across devices</h3>
+    <p class="row-sub" style="margin:-6px 0 14px;">We'll email you a sign-in link — no password needed. Open it on each device you want synced.</p>
+    <div class="field"><label>Email</label><input id="f-email" type="email" placeholder="you@example.com"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="f-cancel">Cancel</button>
+      <button class="btn-submit" id="f-submit">Send link</button>
+    </div>
+  `, (overlay)=>{
+    overlay.querySelector('#f-cancel').onclick = closeModal;
+    overlay.querySelector('#f-submit').onclick = async ()=>{
+      const email = overlay.querySelector('#f-email').value.trim();
+      if(!email || !email.includes('@')) return;
+      const btn = overlay.querySelector('#f-submit');
+      btn.disabled = true;
+      btn.textContent = 'Sending…';
+      try{
+        await window.FB.sendLoginLink(email);
+        openModal(`
+          <h3>Check your email</h3>
+          <p class="row-sub" style="margin:-6px 0 14px;">We sent a sign-in link to ${escapeHtml(email)}. Open it on this device to finish signing in.</p>
+          <div class="modal-actions"><button class="btn-submit" id="f-done">Got it</button></div>
+        `, (o)=> o.querySelector('#f-done').onclick = closeModal);
+      }catch(err){
+        openModal(`
+          <h3>Could not send link</h3>
+          <p class="row-sub" style="margin:-6px 0 14px;">${escapeHtml(err.message)}</p>
+          <div class="modal-actions"><button class="btn-submit" id="f-done">OK</button></div>
+        `, (o)=> o.querySelector('#f-done').onclick = closeModal);
+      }
+    };
+  });
+}
+
+function confirmSignOut(){
+  openModal(`
+    <h3>Sign out?</h3>
+    <p class="row-sub" style="margin:-6px 0 14px;">This device will stop syncing until you sign in again. Your data stays in the cloud.</p>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="f-cancel">Cancel</button>
+      <button class="btn-submit" id="f-submit" style="background:var(--danger);">Sign Out</button>
+    </div>
+  `, (overlay)=>{
+    overlay.querySelector('#f-cancel').onclick = closeModal;
+    overlay.querySelector('#f-submit').onclick = async ()=>{ await window.FB.signOut(); closeModal(); render(); };
+  });
+}
+
+let state = loadState();
+if(!state.reconciliation) state.reconciliation = {bankBalance:null, checkedDate:null};
+let viewDate = new Date();
+let uidCounter = 1;
+function uid(){ return 'id' + (uidCounter++) + '_' + Math.floor(Math.random()*100000); }
+
+function monthKeyOf(date){ return date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0'); }
+function monthLabelOf(date){ return date.toLocaleString('en-US',{month:'long', year:'numeric'}); }
+function peso(n){ return '₱' + Math.round(n).toLocaleString('en-PH'); }
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function getIncomeEvent(payoutId, mk){ return state.incomeEvents.find(e=>e.payoutId===payoutId && e.monthKey===mk); }
+
+// Bucket balances are running totals — they never auto-reset by month.
+// Money added by a payout sits in the bucket until you explicitly log a
+// payment/expense against it, so buckets like Sun Life (paid yearly, not
+// monthly) can accumulate across many cycles.
+function bucketExpected(bucketId){
+  return RULES.filter(r=>r.bucketId===bucketId).reduce((s,r)=>s+r.amount,0);
+}
+function bucketLifetimeAllocated(bucketId){
+  return state.incomeEvents.reduce((sum, ev)=>{
+    const rule = RULES.find(r=>r.payoutId===ev.payoutId && r.bucketId===bucketId);
+    return sum + (rule ? rule.amount : 0);
+  }, 0);
+}
+function bucketBalance(bucketId){
+  return state.transactions
+    .filter(t=>t.bucketId===bucketId)
+    .reduce((sum, t)=>sum + t.amount, 0);
+}
+function trackedTotal(){
+  return BUCKETS.reduce((sum,b)=>sum + bucketBalance(b.id), 0);
+}
+function billsTotal(){
+  return BUCKETS.filter(b=>b.category==='bill').reduce((sum,b)=>sum + bucketBalance(b.id), 0);
+}
+function recentAllowanceSpends(limit){
+  return state.transactions
+    .filter(t=>t.bucketId==='allowance' && t.type==='expense')
+    .slice(-limit)
+    .reverse();
+}
+
+function recordBankBalance(bankBalance){
+  state.reconciliation = {bankBalance, checkedDate: todayISO()};
+  saveState();
+}
+
+// Main entry point for "I checked my bank, here's the number".
+// Diffs it against what the app is currently tracking and figures out
+// whether new money landed (needs allocating) or something's missing.
+function submitBalanceUpdate(newBalance){
+  const delta = newBalance - trackedTotal();
+  if(delta > 0){
+    openPayoutMatchModal(delta, newBalance);
+  } else if(delta < 0){
+    openBalanceDecreaseModal(delta, newBalance);
+  } else {
+    recordBankBalance(newBalance);
+    render();
+  }
+}
+
+function openPayoutMatchModal(delta, newBalance){
+  const optionsHtml = PAYOUTS.map(p=>{
+    const closeMatch = Math.abs(delta - p.defaultAmount) <= 50;
+    return `<button class="choice-btn" data-choice-payout="${p.id}">
+      <span>${p.name}</span>
+      <span class="choice-amount">${peso(p.defaultAmount)}${closeMatch ? '<span class="choice-badge">Likely</span>' : ''}</span>
+    </button>`;
+  }).join('');
+  openModal(`
+    <h3>New money: +${peso(delta)}</h3>
+    <p class="row-sub" style="margin:-6px 0 14px;">Your bank balance is higher than what's tracked. Which payout is this?</p>
+    <div class="choice-list">
+      ${optionsHtml}
+      <button class="choice-btn" data-choice-payout="other"><span>Other / bonus money</span><span class="choice-amount">add to Allowance</span></button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="f-cancel">Cancel</button>
+    </div>
+  `, (overlay)=>{
+    overlay.querySelector('#f-cancel').onclick = closeModal;
+    overlay.querySelectorAll('[data-choice-payout]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const pid = btn.dataset.choicePayout;
+        if(pid === 'other'){
+          state.transactions.push({id:uid(), bucketId:'allowance', monthKey: monthKeyOf(viewDate), amount: delta, type:'allocation', note:'Extra / bonus money', date: todayISO()});
+          saveState();
+        } else {
+          logIncome(pid, delta, todayISO());
+        }
+        recordBankBalance(newBalance);
+        render();
+        openSummaryModal(newBalance);
+      };
+    });
+  });
+}
+
+// Shown after any bank-balance update resolves, so it's always clear
+// exactly where the money ended up: how much for bills vs. spendable.
+function openSummaryModal(newBalance){
+  const bills = billsTotal();
+  const allowance = bucketBalance('allowance');
+  openModal(`
+    <h3>&#10003; Here's where your ${peso(newBalance)} stands</h3>
+    <div class="summary-row"><span>Bills &mdash; saved so far</span><strong>${peso(bills)}</strong></div>
+    <div class="summary-row summary-highlight"><span>Allowance &mdash; yours to spend</span><strong>${peso(allowance)}</strong></div>
+    <div class="modal-actions">
+      <button class="btn-submit" id="f-done">Got it</button>
+    </div>
+  `, (overlay)=>{
+    overlay.querySelector('#f-done').onclick = closeModal;
+  });
+}
+
+function openBalanceDecreaseModal(delta, newBalance){
+  const missing = Math.abs(delta);
+  openModal(`
+    <h3>Bank is ${peso(missing)} lower than tracked</h3>
+    <p class="row-sub" style="margin:-6px 0 14px;">Did you spend something that isn't logged yet?</p>
+    <div class="choice-list">
+      <button class="choice-btn" id="log-missing-expense"><span>Log the missing expense</span><span class="choice-amount">${peso(missing)}</span></button>
+      <button class="choice-btn" id="ignore-gap"><span>Ignore for now</span><span class="choice-amount">e.g. bank fee</span></button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="f-cancel">Cancel</button>
+    </div>
+  `, (overlay)=>{
+    overlay.querySelector('#f-cancel').onclick = closeModal;
+    overlay.querySelector('#ignore-gap').onclick = ()=>{
+      recordBankBalance(newBalance);
+      render();
+      openSummaryModal(newBalance);
+    };
+    overlay.querySelector('#log-missing-expense').onclick = ()=>{
+      recordBankBalance(newBalance);
+      closeModal();
+      openSpendModal(missing, ()=> openSummaryModal(newBalance));
+    };
+  });
+}
+
+function addExpense(bucketId, amount, note, date){
+  state.transactions.push({id:uid(), bucketId, monthKey: monthKeyOf(viewDate), amount: -Math.abs(amount), type:'expense', note: note||'', date: date||todayISO()});
+  saveState();
+  render();
+}
+
+function adjustBucketBalance(bucketId, newBalance, note){
+  const delta = newBalance - bucketBalance(bucketId);
+  if(delta === 0) return;
+  state.transactions.push({id:uid(), bucketId, monthKey: monthKeyOf(viewDate), amount: delta, type:'adjustment', note: note || 'Manual adjustment', date: todayISO()});
+  saveState();
+  render();
+}
+
+function logIncome(payoutId, amount, date){
+  const mk = monthKeyOf(viewDate);
+  let existing = getIncomeEvent(payoutId, mk);
+  if(existing){
+    existing.amount = amount;
+    existing.date = date;
+    // drop this event's previous allocations so editing doesn't double-count
+    state.transactions = state.transactions.filter(t=>t.incomeEventId !== existing.id);
+  } else {
+    existing = {id:uid(), payoutId, monthKey: mk, amount, date};
+    state.incomeEvents.push(existing);
+  }
+  RULES.filter(r=>r.payoutId===payoutId).forEach(r=>{
+    state.transactions.push({id:uid(), bucketId:r.bucketId, monthKey: mk, amount:r.amount, type:'allocation', note:'', date, incomeEventId: existing.id});
+  });
+  saveState();
+  render();
+}
+
+// ---------- Modal ----------
+function openModal(html, onMount){
+  let overlay = document.getElementById('overlay');
+  if(!overlay){
+    overlay = document.createElement('div');
+    overlay.id = 'overlay';
+    overlay.className = 'overlay hidden';
+    overlay.addEventListener('click', (e)=>{ if(e.target === overlay) closeModal(); });
+    document.body.appendChild(overlay);
+  }
+  overlay.innerHTML = '<div class="modal">' + html + '</div>';
+  overlay.classList.remove('hidden');
+  if(onMount) onMount(overlay);
+}
+function closeModal(){
+  const overlay = document.getElementById('overlay');
+  if(overlay) overlay.classList.add('hidden');
+}
+
+function openIncomeModal(payout){
+  const mk = monthKeyOf(viewDate);
+  const existing = getIncomeEvent(payout.id, mk);
+  const amount = existing ? existing.amount : payout.defaultAmount;
+  const date = existing ? existing.date : todayISO();
+  openModal(`
+    <h3>${existing ? 'Edit' : 'Log'} income — ${payout.name}</h3>
+    <div class="field"><label>Amount received</label><input id="f-amount" type="number" value="${amount}" inputmode="decimal"></div>
+    <div class="field"><label>Date received</label><input id="f-date" type="date" value="${date}"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="f-cancel">Cancel</button>
+      <button class="btn-submit" id="f-submit">${existing ? 'Save' : 'Log it'}</button>
+    </div>
+  `, (overlay)=>{
+    overlay.querySelector('#f-cancel').onclick = closeModal;
+    overlay.querySelector('#f-submit').onclick = ()=>{
+      const amt = parseFloat(overlay.querySelector('#f-amount').value) || 0;
+      const dt = overlay.querySelector('#f-date').value || todayISO();
+      logIncome(payout.id, amt, dt);
+      closeModal();
+    };
+  });
+}
+
+// Spending is always against Allowance — that's the only bucket you draw
+// down day-to-day, bills get settled via "Log payment" instead.
+function openSpendModal(prefillAmount, onDone){
+  const balance = bucketBalance('allowance');
+  const amountValue = prefillAmount !== undefined ? prefillAmount : '';
+  openModal(`
+    <h3>Spend from Allowance</h3>
+    <p class="row-sub" style="margin:-6px 0 14px;">Currently available: <strong>${peso(balance)}</strong></p>
+    <div class="field"><label>Amount</label><input id="f-amount" type="number" value="${amountValue}" placeholder="0" inputmode="decimal" autofocus></div>
+    <div class="field"><label>What was it for? (optional)</label><input id="f-note" type="text" placeholder="e.g. Jollibee, Grab, groceries"></div>
+    <div class="field"><label>Date</label><input id="f-date" type="date" value="${todayISO()}"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="f-cancel">Cancel</button>
+      <button class="btn-submit" id="f-submit">Spend</button>
+    </div>
+  `, (overlay)=>{
+    overlay.querySelector('#f-cancel').onclick = closeModal;
+    overlay.querySelector('#f-submit').onclick = ()=>{
+      const amt = parseFloat(overlay.querySelector('#f-amount').value) || 0;
+      const note = overlay.querySelector('#f-note').value;
+      const dt = overlay.querySelector('#f-date').value || todayISO();
+      if(amt > 0){ addExpense('allowance', amt, note, dt); }
+      closeModal();
+      if(onDone) onDone();
+    };
+  });
+}
+
+function markBucketPaid(bucketId){
+  const due = bucketBalance(bucketId);
+  if(due > 0) addExpense(bucketId, due, 'Marked as paid', todayISO());
+}
+
+function openAdjustModal(bucket){
+  const current = bucketBalance(bucket.id);
+  openModal(`
+    <h3>Adjust "${bucket.name}" balance</h3>
+    <p class="row-sub" style="margin:-6px 0 14px;">Current balance: ${peso(current)}. Use this to correct drift or seed what you've already saved.</p>
+    <div class="field"><label>Correct balance to</label><input id="f-amount" type="number" value="${current}" inputmode="decimal"></div>
+    <div class="field"><label>Reason (optional)</label><input id="f-note" type="text" placeholder="e.g. matched against bank balance"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="f-cancel">Cancel</button>
+      <button class="btn-submit" id="f-submit">Save</button>
+    </div>
+  `, (overlay)=>{
+    overlay.querySelector('#f-cancel').onclick = closeModal;
+    overlay.querySelector('#f-submit').onclick = ()=>{
+      const amt = parseFloat(overlay.querySelector('#f-amount').value);
+      const note = overlay.querySelector('#f-note').value;
+      if(!isNaN(amt)) adjustBucketBalance(bucket.id, amt, note);
+      closeModal();
+    };
+  });
+}
+
+// Builds the emphasized, color-coded banner for a bank-vs-tracked gap.
+// Used both for the live preview (as you type) and the last-checked state.
+function diffBannerHtml(diff, checkedDate){
+  if(diff === 0){
+    return `<div class="diff-banner diff-match">&#10003; Matches exactly${checkedDate ? ` &mdash; checked ${checkedDate}` : ''}</div>`;
+  } else if(diff > 0){
+    return `<div class="diff-banner diff-off">&#9888;&#65039; Bank is ${peso(diff)} MORE than the app expects &mdash; extra income, or a payout you forgot to log?</div>`;
+  } else {
+    return `<div class="diff-banner diff-off">&#9888;&#65039; Bank is ${peso(Math.abs(diff))} LESS than the app expects &mdash; an expense that hasn't been logged yet?</div>`;
+  }
+}
+
+function renderReconcileCard(){
+  const tracked = trackedTotal();
+  const rec = state.reconciliation;
+  const resultHtml = (rec && rec.bankBalance !== null && rec.bankBalance !== undefined)
+    ? diffBannerHtml(rec.bankBalance - tracked, rec.checkedDate)
+    : '';
+  return `<div class="reconcile-card">
+    <p class="reconcile-title">What's in your bank right now?</p>
+    <p class="row-sub" style="margin:0 0 10px;">The app currently shows you have <strong>${peso(tracked)}</strong> (Bills + Allowance combined). Type your real bank balance below to update it.</p>
+    <div style="display:flex; gap:8px;">
+      <input id="bank-balance-input" type="number" placeholder="e.g. 50000" value="" inputmode="decimal" style="flex:1; padding:9px 10px; border-radius:10px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:14px;">
+      <button id="check-bank-balance" class="btn-small primary" style="flex:none;">Update</button>
+    </div>
+    <div id="balance-live-diff">${resultHtml}</div>
+  </div>`;
+}
+
+// ---------- Render ----------
+function render(){
+  const mk = monthKeyOf(viewDate);
+  const app = document.getElementById('app');
+
+  const allowanceLifetime = bucketLifetimeAllocated('allowance');
+  const allowanceBalance = bucketBalance('allowance');
+  const allowanceExpected = bucketExpected('allowance');
+
+  let html = '';
+  html += `<div class="header">
+    <h1>Finance Tracker <span class="badge-proto">Prototype</span></h1>
+  </div>`;
+  html += `<div class="month-nav">
+      <button id="prev-month">&larr;</button>
+      <span>${monthLabelOf(viewDate)}</span>
+      <button id="next-month">&rarr;</button>
+    </div>`;
+
+  html += renderReconcileCard();
+
+  const recentSpends = recentAllowanceSpends(5);
+  html += `<div class="allowance-card">
+    <div class="label">Your Allowance</div>
+    <div class="amount">${peso(allowanceBalance)}</div>
+    <div class="sub">${allowanceLifetime > 0 ? `available to spend &middot; ${peso(allowanceLifetime)} received to date` : `not yet received (expected ${peso(allowanceExpected)} on the 15th)`}</div>
+    <button id="spend-button">Spend</button>
+    <button id="adjust-allowance" style="margin-top:8px; background:transparent; border:none; color:rgba(255,255,255,.8); text-decoration:underline; font-size:12px; width:auto; padding:0;">Adjust balance</button>
+    <div class="allowance-history">
+      <p class="allowance-history-title">Recent spends</p>
+      ${recentSpends.length === 0
+        ? `<p class="allowance-history-empty">Nothing logged yet.</p>`
+        : recentSpends.map(t=>`<div class="allowance-history-row"><span>${t.date}${t.note ? ' &middot; ' + escapeHtml(t.note) : ''}</span><span>-${peso(Math.abs(t.amount))}</span></div>`).join('')
+      }
+    </div>
+  </div>`;
+
+  html += `<div class="section-title">Payouts</div>`;
+  PAYOUTS.forEach(p=>{
+    const ev = getIncomeEvent(p.id, mk);
+    html += `<div class="row-card" data-payout="${p.id}">
+      <div class="row-main">
+        <p class="row-title">${p.name}</p>
+        <p class="row-sub">Day ${p.day} &middot; expected ${peso(p.defaultAmount)}${ev ? ` &middot; received ${ev.date}` : ''}</p>
+      </div>
+      <div class="row-right">
+        ${ev
+          ? `<div class="row-amount">${peso(ev.amount)}</div><span class="chip chip-received">Received</span>`
+          : `<button class="btn-small primary" data-action="log-income" data-payout="${p.id}">Log income</button>`
+        }
+      </div>
+    </div>`;
+  });
+
+  html += `<div class="section-title">Bills</div>`;
+  html += `<p class="row-sub" style="margin:-4px 4px 10px;">How much you've already saved for each bill, from payouts received so far.</p>`;
+  BUCKETS.filter(b=>b.category==='bill').forEach(b=>{
+    const expected = bucketExpected(b.id);
+    const balance = bucketBalance(b.id);
+
+    html += `<div class="row-card">
+      <div class="row-main">
+        <p class="row-title">${b.name}</p>
+        <p class="row-sub">adds ${peso(expected)}/mo when payouts land</p>
+      </div>
+      <div class="row-right" style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+        <div>
+          <div class="row-amount-lg">${peso(balance)}</div>
+          <p class="row-sub" style="margin:0;">${balance > 0 ? 'saved so far' : 'nothing saved yet'}</p>
+        </div>
+        <div style="display:flex; gap:6px;">
+          ${balance > 0 ? `<button class="btn-small" data-action="mark-paid" data-bucket="${b.id}">Log payment</button>` : ''}
+          <button class="btn-small" data-action="adjust" data-bucket="${b.id}">Adjust</button>
+        </div>
+      </div>
+    </div>`;
+  });
+
+  html += `<div class="footnote">
+    <div class="sync-line">${
+      cloudUser
+        ? `Synced as ${escapeHtml(cloudUser.email)} &middot; <button class="link-btn" id="btn-signout">Sign out</button>`
+        : `<button class="link-btn" id="btn-sync">Sync across devices</button> to use this on your phone too`
+    }</div>
+    <button id="reset-data">Reset all data</button>
+  </div>`;
+
+  app.innerHTML = html;
+
+  // wire events
+  app.querySelector('#prev-month').onclick = ()=>{ viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth()-1, 1); render(); };
+  app.querySelector('#next-month').onclick = ()=>{ viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth()+1, 1); render(); };
+  app.querySelector('#spend-button').onclick = ()=> openSpendModal();
+  app.querySelector('#adjust-allowance').onclick = ()=> openAdjustModal(BUCKETS.find(b=>b.id==='allowance'));
+  app.querySelector('#check-bank-balance').onclick = ()=>{
+    const val = parseFloat(app.querySelector('#bank-balance-input').value);
+    if(!isNaN(val)) submitBalanceUpdate(val);
+  };
+  app.querySelector('#bank-balance-input').addEventListener('input', (e)=>{
+    const liveDiff = document.getElementById('balance-live-diff');
+    const val = parseFloat(e.target.value);
+    if(e.target.value === '' || isNaN(val)){ liveDiff.innerHTML = ''; return; }
+    liveDiff.innerHTML = diffBannerHtml(val - trackedTotal());
+  });
+  app.querySelectorAll('[data-action="log-income"]').forEach(btn=>{
+    btn.onclick = ()=> openIncomeModal(PAYOUTS.find(p=>p.id===btn.dataset.payout));
+  });
+  app.querySelectorAll('[data-payout]').forEach(row=>{
+    row.addEventListener('click', (e)=>{
+      if(e.target.closest('[data-action]')) return;
+      const payout = PAYOUTS.find(p=>p.id===row.dataset.payout);
+      if(getIncomeEvent(payout.id, mk)) openIncomeModal(payout);
+    });
+  });
+  app.querySelectorAll('[data-action="adjust"]').forEach(btn=>{
+    btn.onclick = (e)=>{ e.stopPropagation(); openAdjustModal(BUCKETS.find(b=>b.id===btn.dataset.bucket)); };
+  });
+  app.querySelectorAll('[data-action="mark-paid"]').forEach(btn=>{
+    btn.onclick = (e)=>{ e.stopPropagation(); markBucketPaid(btn.dataset.bucket); };
+  });
+  app.querySelector('#reset-data').onclick = ()=>{
+    if(confirm('Clear all data on this device (and in the cloud if synced)?')){ state = {incomeEvents:[], transactions:[], reconciliation:{bankBalance:null, checkedDate:null}}; saveState(); render(); }
+  };
+  const syncBtn = app.querySelector('#btn-sync');
+  if(syncBtn) syncBtn.onclick = openSyncEmailModal;
+  const signOutBtn = app.querySelector('#btn-signout');
+  if(signOutBtn) signOutBtn.onclick = confirmSignOut;
+}
+
+render();
+</script>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
+  import { getAuth, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
+  import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
+
+  // TODO: replace with your own project's config (Firebase console →
+  // Project settings → Your apps → Web app). Safe to be public/client-side.
+  const firebaseConfig = {
+    apiKey: "REPLACE_ME",
+    authDomain: "REPLACE_ME.firebaseapp.com",
+    projectId: "REPLACE_ME",
+    storageBucket: "REPLACE_ME.firebasestorage.app",
+    messagingSenderId: "REPLACE_ME",
+    appId: "REPLACE_ME",
+  };
+
+  const fbApp = initializeApp(firebaseConfig);
+  const auth = getAuth(fbApp);
+  const db = getFirestore(fbApp);
+
+  let unsubscribeSnapshot = null;
+  let lastLocalWriteAt = 0;
+
+  async function completeSignInIfNeeded(){
+    if (!isSignInWithEmailLink(auth, window.location.href)) return false;
+    const storedEmail = localStorage.getItem('financeTracker.pendingEmail');
+    if (storedEmail){
+      await signInWithEmailLink(auth, storedEmail, window.location.href);
+      localStorage.removeItem('financeTracker.pendingEmail');
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return true;
+    }
+    return new Promise((resolve)=>{
+      window.openModal(`
+        <h3>Confirm your email</h3>
+        <p class="row-sub" style="margin:-6px 0 14px;">Enter the email you used to request this sign-in link.</p>
+        <div class="field"><input id="f-email" type="email" placeholder="you@example.com"></div>
+        <div class="modal-actions">
+          <button class="btn-cancel" id="f-cancel">Cancel</button>
+          <button class="btn-submit" id="f-submit">Sign In</button>
+        </div>
+      `, (overlay)=>{
+        overlay.querySelector('#f-cancel').onclick = ()=>{ window.closeModal(); resolve(false); };
+        overlay.querySelector('#f-submit').onclick = async ()=>{
+          const typedEmail = overlay.querySelector('#f-email').value.trim();
+          try{
+            await signInWithEmailLink(auth, typedEmail, window.location.href);
+            window.history.replaceState({}, document.title, window.location.pathname);
+            window.closeModal();
+            resolve(true);
+          }catch(err){
+            alert('Sign-in failed: ' + err.message);
+            resolve(false);
+          }
+        };
+      });
+    });
+  }
+
+  window.FB = {
+    user: null,
+    sendLoginLink: async (email)=>{
+      await sendSignInLinkToEmail(auth, email, { url: window.location.href, handleCodeInApp: true });
+      localStorage.setItem('financeTracker.pendingEmail', email);
+    },
+    signOut: async ()=>{
+      if (unsubscribeSnapshot){ unsubscribeSnapshot(); unsubscribeSnapshot = null; }
+      await signOut(auth);
+    },
+    pushState: async (stateObj)=>{
+      if (!auth.currentUser) return;
+      lastLocalWriteAt = Date.now();
+      await setDoc(doc(db, 'users', auth.currentUser.uid), {
+        data: JSON.stringify(stateObj),
+        updatedAt: lastLocalWriteAt
+      });
+    },
+    fetchOnce: async ()=>{
+      if (!auth.currentUser) return null;
+      const snap = await getDoc(doc(db, 'users', auth.currentUser.uid));
+      return snap.exists() ? snap.data().data : null;
+    },
+    startSync: (onRemoteUpdate)=>{
+      if (!auth.currentUser) return;
+      if (unsubscribeSnapshot) unsubscribeSnapshot();
+      unsubscribeSnapshot = onSnapshot(doc(db, 'users', auth.currentUser.uid), (snap)=>{
+        if (!snap.exists()) return;
+        const remote = snap.data();
+        if (remote.updatedAt && remote.updatedAt > lastLocalWriteAt + 500){
+          onRemoteUpdate(remote.data);
+        }
+      });
+    }
+  };
+
+  onAuthStateChanged(auth, (user)=>{
+    window.FB.user = user;
+    window.dispatchEvent(new CustomEvent('fb-auth-changed', { detail: { user } }));
+  });
+
+  completeSignInIfNeeded();
+</script>
+</body>
+</html>
